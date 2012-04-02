@@ -37,7 +37,7 @@ class stubRestHandlerFactoryTestCase extends PHPUnit_Framework_TestCase
      */
     public function setUp()
     {
-        $this->mockInjector = $this->getMock('stubInjector');
+        $this->mockInjector       = $this->getMock('stubInjector');
         $this->restHandlerFactory = new stubRestHandlerFactory($this->mockInjector, array('foo/' => 'foo::MyRestHandler'));
     }
 
@@ -103,6 +103,21 @@ class stubRestHandlerFactoryTestCase extends PHPUnit_Framework_TestCase
                            ->will($this->returnValue($restHandler));
         $this->assertSame($restHandler, $this->restHandlerFactory->createHandler('foo/some/more'));
         $this->assertNull($this->restHandlerFactory->getDispatchUri('bar/'));
+    }
+
+    /**
+     * @since  1.8.0
+     * @test
+     * @group  service_rest_index
+     */
+    public function createHandlerReturnsIndexHandlerForEmptyUri()
+    {
+        $restHandler = new stdClass();
+        $this->mockInjector->expects($this->once())
+                           ->method('getInstance')
+                           ->with($this->equalTo('net::stubbles::service::rest::index::stubIndexRestHandler'))
+                           ->will($this->returnValue($restHandler));
+        $this->assertSame($restHandler, $this->restHandlerFactory->createHandler(''));
     }
 }
 ?>

@@ -73,6 +73,10 @@ class stubRestHandlerFactory extends stubBaseObject
             }
         }
 
+        if ('' === $uri) {
+            return $this->injector->getInstance('net::stubbles::service::rest::index::stubIndexRestHandler');
+        }
+
         return null;
     }
 
