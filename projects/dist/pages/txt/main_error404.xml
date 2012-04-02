@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<parts
+    xmlns:stub="http://stubbles.net/stub"
+    xmlns:ixsl="http://www.w3.org/1999/XSL/Transform"
+    exclude-result-prefixes="stub ixsl">
+  <part name="content">
+    <h1><stub:include part="headline"/></h1>
+    <div>
+      <p><stub:include part="error404"/></p>
+    </div>
+  </part>
+
+  <part name="headline">
+    <stub:langselect>
+      <stub:lang name="default">Error 404</stub:lang>
+      <stub:lang name="en_*">Error 404</stub:lang>
+      <stub:lang name="de_*">Fehler 404</stub:lang>
+    </stub:langselect>
+  </part>
+
+  <part name="error404">
+    <stub:langselect>
+      <stub:lang name="default">The requested resource could not be found.</stub:lang>
+      <stub:lang name="en_*">The requested resource could not be found.</stub:lang>
+      <stub:lang name="de_*">Die gewünschte Resource konnte nicht gefunden werden.</stub:lang>
+    </stub:langselect>
+  </part>
+</parts>

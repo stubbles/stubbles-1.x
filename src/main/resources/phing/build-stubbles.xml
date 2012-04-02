@@ -1,0 +1,770 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="Stubbles" default="main">
+  <property name="stubbles.lib.path" value="${project.basedir}/lib"/>
+  <property name="stubbles.report.dir" value="${project.basedir}/docs/reports"/>
+  <property name="stubbles.projects.path" value="${project.basedir}/projects"/>
+  <property name="stubbles.src.path" value="${project.basedir}/src/main"/>
+  <property name="stubbles.project.path" value="${stubbles.projects.path}/${stubbles.project}"/>
+
+  <property name="phpcpd.report.file" value="${stubbles.report.dir}/cpd.xml"/>
+  <property name="phpcpd.namespace" value="de/ui"/>
+  <property name="phpmd.report.rulesets" value="codesize,unusedcode,naming"/>
+  <property name="check-style.report.file" value="${stubbles.report.dir}/checkstyle.xml"/>
+  <property name="check-style.path" value="main"/>
+  <property name="check-style.namespace" value=" "/>
+  <property name="phpunit.test.coverage" value="true"/>
+  <property name="phpunit.test.groups" value=" "/>
+  <property name="phpunit.test.excludeGroups" value=" "/>
+
+  <fileset id="srcfiles" dir="${project.basedir}/src/main/php">
+    <include name="**/*.php"/>
+    <exclude name="**/org/**"/>
+  </fileset>
+  
+  <fileset id="testfiles" dir="${project.basedir}/src/test/php">
+    <include name="**/*TestCase*.php"/>
+    <include name="**/*Test.php"/>
+  </fileset>
+
+  <php expression="ini_set('memory_limit', -1);"/>
+
+  <target name="setup" depends="setup-build" description="Does the initial setup after installation.">
+    <echo>Your installation ${application.installation.name} has been set up correctly.</echo>
+    <phing phingfile="build-project.xml" target="setup-project">
+      <property name="stubbles.project" value="${application.installation.first-project}"/>
+      <property name="stubbles.project.path" value="${stubbles.projects.path}/${stubbles.project}"/>
+      <property name="stubbles.project.copy" value="dist"/>
+    </phing>
+  </target>
+
+  <target name="setup-build" description="Asks for the name of the installation.">
+    <input propertyname="application.installation.name" promptChar=":">Please enter the name of this installation</input>
+    <input propertyname="application.installation.default-package-name" promptChar=":">Please enter the name of the default package for PHPDoc</input>
+    <input propertyname="application.installation.first-project" promptChar=":">Please enter the name of your first project</input>
+    <!-- We need to copy and to delete instead of moving the file because move
+         does not support the filterchain filter, probably a bug in Phing? /-->
+    <copy file="${project.basedir}/build-dist.xml" tofile="${project.basedir}/build.xml" overwrite="false">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </copy>
+    <delete file="${project.basedir}/build-dist.xml"/>
+  </target>
+
+  <target name="clean-dist" description="Removes project dist from the build.">
+    <echo>----------------------------------</echo>
+    <echo>| Removing dist project          |</echo>
+    <echo>----------------------------------</echo>
+    <echo>After removing the dist files, you will not be able to execute "setup-project" anymore.</echo>
+    <input propertyname="cleanup.dist.confirm" promptChar="?" defaultValue="N">Are you sure, you want to remove project dist? (Y/N)</input>
+    <if>
+      <equals arg1="${cleanup.dist.confirm}" arg2="Y" casesensitive="false"/>
+      <then>
+        <delete dir="${stubbles.projects.path}/dist" includeemptydirs="true" verbose="true" failonerror="true"/>
+      </then>
+    </if>
+  </target>
+
+  <target name="clear-cache" description="Removes all cache files.">
+    <echo>----------------------------------</echo>
+    <echo>| Clearing cache                 |</echo>
+    <echo>----------------------------------</echo>
+    <delete file="${stubbles.lib.path}/.cache" verbose="true"/>
+    <delete>
+      <fileset dir="${stubbles.projects.path}">
+        <include name="**/cache/**"/>
+      </fileset>
+    </delete>
+  </target>
+
+  <target name="generate-project-list" description="Generates list of projects.">
+    <adhoc-task name="projectList"><![CDATA[
+      if (class_exists('Projectlist', false) === false) {
+          $GLOBALS['__projectListTask'] = 1;
+          class Projectlist extends Task
+          {
+              /**
+               * directory where projects reside
+               *
+               * @var  string
+               */
+              protected $projectDir;
+              
+              /**
+               * sets directory where projects reside
+               *
+               * @var  string  $projectDir
+               */
+              public function setProjectDir($projectDir)
+              {
+                  $this->projectDir = $projectDir;
+              }
+              
+              /**
+               * main execution method
+               */
+              public function main()
+              {
+                  $projects = array();
+                  $dirIt    = new DirectoryIterator($this->projectDir);
+                  foreach ($dirIt as $dir) {
+                      if ($dir->isDot() === true || $dir->isDir() === false || substr($dir->getFilename(), 0, 1) === '.') {
+                          continue;
+                      }
+                      
+                      $projects[] = $dir->getFilename();
+                  }
+                  
+                  $this->project->setProperty('projects', join(',', $projects));
+              }
+          }
+      } else {
+          // evil, evil, evil (wtf?)
+          // phing does not keep the task defined if a target is called from
+          // another build file, but PHP keeps the class in memory
+          // but you just can't define the task as phing complains if no new task
+          // was defined within <adhoc-task/>
+          $GLOBALS['__projectListTask']++;
+          eval('class ProjectList' . $GLOBALS['__projectListTask'] . ' extends Projectlist { }');
+      }
+    ]]></adhoc-task>
+    <projectList projectDir="${stubbles.projects.path}"/>
+  </target>
+
+  <target name="generate-clients" depends="generate-project-list" description="Generates JSON-RPC clients for all projects.">
+    <echo>----------------------------------</echo>
+    <echo>| Generating JSON-RPC proxies    |</echo>
+    <echo>----------------------------------</echo>
+    <if>
+      <not>
+        <equals arg1="${projects}" arg2=""/>
+      </not>
+      <then>
+        <php expression="require_once '${project.basedir}/bootstrap.php';"/>
+        <adhoc-task name="generateJsonRpcProxies"><![CDATA[
+          class GenerateJsonRpcProxiesTask extends Task
+          {
+              /**
+               * Target folder of the generated proxy files
+               *
+               * @var  string
+               */
+              protected  $docroot;
+              /**
+               * File containing the service definitions
+               *
+               * @var  string
+               */
+              protected $serviceFile;
+              /**
+               * Namespace for the generated javascript code
+               *
+               * @var  string
+               */
+              protected $javaScriptNamespace = 'stubbles.json.proxy';
+              /**
+               * default target dir within docroot
+               *
+               * @var  string
+               */
+              protected $genJsDir            = 'javascript/genjs';
+
+              /**
+               * Set the target folder for the generated proxies
+               *
+               * @param  string  $docroot
+               */
+              public function setDocroot($docroot)
+              {
+                  $this->docroot = $docroot;
+              }
+
+              /**
+               * Set the service file, that contains the web service definitions
+               *
+               * @param string $serviceFile
+               */
+              public function setServiceFile($serviceFile)
+              {
+                  $this->serviceFile = $serviceFile;
+              }
+
+              /**
+               * The init method: Do init steps.
+               */
+              public function init()
+              {
+                  // nothing to do here
+              }
+
+              /**
+               * The main entry point method.
+               */
+              public function main()
+              {
+                  stubClassLoader::load('net::stubbles::service::jsonrpc::util::stubJsonRpcProxyGenerator');
+                  $services   = parse_ini_file($this->serviceFile, true);
+                  $generator  = new stubJsonRpcProxyGenerator();
+                  if (isset($services['config']['namespace']) === false) {
+                      $services['config']['namespace'] = $this->javaScriptNamespace;
+                  }
+                  
+                  if (isset($services['config']['genjsdir']) === false) {
+                      $services['config']['genjsdir'] = $this->genJsDir;
+                  }
+                  
+                  if (file_exists($this->docroot . '/' . $services['config']['genjsdir']) === false) {
+                      mkdir($this->docroot . '/' . $services['config']['genjsdir'], null, true);
+                  }
+                  
+                  $fullJsCode = $services['config']['namespace'] . " = {};\n\n";
+                  foreach ($services['classmap'] as $class => $fqClassName) {
+                      try {
+                          $jsCode = $generator->generateJavascriptProxy($fqClassName, $class, $services['config']['namespace']);
+                      } catch (stubClassNotFoundException $e) {
+                          $this->log("Cannot generate proxy for {$fqClassName}, class does not exist.", Project::MSG_ERR);
+                          throw new BuildException("Cannot generate proxy for {$fqClassName}, class does not exist.");
+                      }
+                      
+                      $targetFile = $this->docroot . '/' . $services['config']['genjsdir'] . '/' . $class . '.js';
+                      if (@file_put_contents($targetFile, $jsCode)) {;
+                          $this->log("Wrote proxy for {$fqClassName} to {$targetFile}.");
+                      } else {
+                          $this->log("Cannot write proxy for {$fqClassName} to {$targetFile}.", Project::MSG_ERR);
+                          throw new BuildException("Cannot write proxy classes to {$targetFile}.");
+                      }
+                      
+                      $fullJsCode .= $jsCode;
+                  }
+                  
+                  if (empty($jsCode)) {
+                      return;
+                  }
+                  
+                  $targetFile = $this->docroot . '/' . $services['config']['genjsdir'] . '/allClients.js';
+                  if (@file_put_contents($targetFile, $fullJsCode)) {;
+                      $this->log("Wrote proxy for all classes to {$targetFile}.");
+                  } else {
+                      $this->log("Cannot write proxy classes to {$targetFile}.", Project::MSG_ERR);
+                      throw new BuildException("Cannot write proxy classes to {$targetFile}.");
+                  }
+              }
+          }
+        ]]></adhoc-task>
+        <foreach list="${projects}" param="stubbles.project" target="generate-client-project"/>
+      </then>
+      <else>
+        <echo>No project with JSON-RPC-Service configuration found.</echo>
+      </else>
+    </if>
+  </target>
+
+  <target name="generate-client-project" description="Generates JSON-RPC clients for a specific project.">
+    <if>
+      <available file="${stubbles.projects.path}/${stubbles.project}/config/json-rpc-service.ini"/>
+      <then>
+        <php expression="stubBootstrap::init('${stubbles.projects.path}/${stubbles.project}');"/>
+        <generateJsonRpcProxies serviceFile="${stubbles.projects.path}/${stubbles.project}/config/json-rpc-service.ini"
+                                    docroot="${stubbles.projects.path}/${stubbles.project}/docroot"/>
+      </then>
+      <else>
+        <echo>No json-rpc-service.ini configuration file available for project ${stubbles.project}.</echo>
+        <echo>Skipping JSON-RPC client generation.</echo>
+      </else>
+    </if>
+  </target>
+
+  <target name="check-routes"  depends="generate-project-list" description="Checks if all routes are correctly set up.">
+    <adhoc-task name="check-routes"><![CDATA[
+      class CheckRoutesTask extends Task
+      {
+          /**
+           * directory where projects reside
+           *
+           * @var  string
+           */
+          protected $routeDir;
+          /**
+           * project to check
+           *
+           * @var  string
+           */
+          protected $projectName;
+          
+          /**
+           * sets directory where pages reside
+           *
+           * @var  string  $routeDir
+           */
+          public function setRouteDir($routeDir)
+          {
+              $this->routeDir = $routeDir;
+          }
+          
+          /**
+           * sets project to check
+           *
+           * @param  string  $projectName
+           */
+          public function setProjectName($projectName)
+          {
+              $this->projectName = $projectName;
+          }
+          
+          /**
+           * main execution method
+           */
+          public function main()
+          {
+              $this->log('Checking project ' . $this->projectName);
+              $xslErrors = 0;
+              if (file_exists($this->routeDir . '/' . $this->projectName . '/pages/conf') === true) {
+                  $dirIt     = new DirectoryIterator($this->routeDir . '/' . $this->projectName . '/pages/conf');
+                  foreach ($dirIt as $file) {
+                      if ($file->isFile() === false) {
+                          continue;
+                      }
+                      
+                      $routeName = str_replace('.ini', '', $file->getFilename());
+                      if (file_exists($this->routeDir . '/' . $this->projectName . '/pages/txt/main_' . $routeName . '.xml') === false) {
+                          $xslErrors++;
+                          $this->log('XSL file txt/main_' . $routeName . '.xml for route conf/' . $routeName . ".xml is missing.\n", Project::MSG_ERR);
+                      }
+                  }
+              }
+              
+              $confErrors = 0;
+              if (file_exists($this->routeDir . '/' . $this->projectName . '/pages/txt') === true) {
+                  $dirIt  = new DirectoryIterator($this->routeDir . '/' . $this->projectName . '/pages/txt');
+                  foreach ($dirIt as $file) {
+                      if ($file->isFile() === false || substr($file->getFilename(), 0, 6) !== 'main_') {
+                          continue;
+                      }
+                      
+                      $routeName = str_replace('main_', '', str_replace('.xml', '', $file->getFilename()));
+                      if (file_exists($this->routeDir . '/' . $this->projectName . '/pages/conf/' . $routeName . '.ini') === false) {
+                          $confErrors++;
+                          $this->log('Config file conf/' . $routeName . '.xml for txt/main_' . $routeName . ".ini is missing.\n", Project::MSG_ERR);
+                      }
+                  }
+              }
+              
+              $this->log($xslErrors . ' xsl error(s) in project ' . $this->projectName);
+              $this->log($confErrors . ' config error(s) in project ' . $this->projectName);
+          }
+      }
+    ]]></adhoc-task>
+    <foreach list="${projects}" param="stubbles.project" target="check-routes-project"/>
+  </target>
+
+  <target name="check-routes-project" description="Checks if all routes are correctly set up.">
+    <check-routes routeDir="${stubbles.projects.path}" projectName="${stubbles.project}"/>
+  </target>
+
+  <target name="generate-sitemaps" depends="generate-project-list" description="Creates a Google sitemap for each project.">
+    <echo>----------------------------------</echo>
+    <echo>| Generating Google sitemaps     |</echo>
+    <echo>----------------------------------</echo>
+    <php expression="require_once '${project.basedir}/bootstrap.php';"/>
+    <adhoc-task name="generate-sitemap"><![CDATA[
+      class GenerateSitemapTask extends Task
+      {
+          /**
+           * directory where projects reside
+           *
+           * @var  string
+           */
+          protected $projectsDir;
+          /**
+           * project to check
+           *
+           * @var  string
+           */
+          protected $projectName;
+          
+          /**
+           * sets directory where projects reside
+           *
+           * @var  string  $projectsDir
+           */
+          public function setProjectsDir($projectsDir)
+          {
+              $this->projectsDir = $projectsDir;
+          }
+
+          /**
+           * sets project to check
+           *
+           * @param  string  $projectName
+           */
+          public function setProjectName($projectName)
+          {
+              $this->projectName = $projectName;
+          }
+                    
+          /**
+           * main execution method
+           */
+          public function main()
+          {
+              if (file_exists($this->projectsDir . '/' . $this->projectName . '/pages/conf') === false) {
+                  return;
+              }
+              
+              $this->log('Generating Google sitemap for project ' . $this->projectName);
+              stubClassLoader::load('net::stubbles::lang::stubProperties',
+                                    'net::stubbles::webapp::xml::route::stubPropertyBasedRouteReader',
+                                    'net::stubbles::xml::stubXmlStreamWriterProvider'
+              );
+              
+              $properties = new stubProperties(array('default' => parse_ini_file($this->projectsDir . '/' . $this->projectName . '/config/config.ini')));
+              if ($properties->hasValue('default', 'net.stubbles.project.url') === false) {
+                  $this->log('Can not create Google sitemap for project ' . $this->projectName . ', config option net.stubbles.project.url not set.');
+                  return;
+              }
+              
+              $baseUrl         = $properties->getValue('default', 'net.stubbles.project.url');
+              $xmlStreamWriterProvider = new stubXmlStreamWriterProvider();
+              $xmlStreamWriter = $xmlStreamWriterProvider->get();
+              $xmlStreamWriter->writeStartElement('urlset');
+              $xmlStreamWriter->writeAttribute('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+              $routeReader    = new stubPropertyBasedRouteReader($this->projectsDir . '/' . $this->projectName . '/pages');
+              $dirIt          = new DirectoryIterator($this->projectsDir . '/' . $this->projectName . '/pages/conf');
+              $sitemapEntries = 0;
+              foreach ($dirIt as $file) {
+                  if ($file->isFile() === false) {
+                      continue;
+                  }
+                  
+                  $routeName = str_replace('.ini', '', $file->getFilename());
+                  $route     = $routeReader->getRoute($routeName);
+                  if (null === $route || $route->getPropertyAsBool('sitemap-enable', true) === false) {
+                      continue;
+                  }
+                  
+                  $sitemapEntries++;
+                  $xmlStreamWriter->writeStartElement('url');
+                  if ('index' !== $routeName) {
+                      $xmlStreamWriter->writeElement('loc', array(), $baseUrl . $routeName);
+                      $defaultPriority = '0.5';
+                  } else {
+                      $xmlStreamWriter->writeElement('loc', array(), $baseUrl);
+                      $defaultPriority = '1.0';
+                  }
+                  
+                  $xmlStreamWriter->writeElement('changefreq', array(), $route->getProperty('sitemap-changefreq', 'weekly'));
+                  $xmlStreamWriter->writeElement('priority', array(), $route->getProperty('sitemap-priority', $defaultPriority));
+                  $xmlStreamWriter->writeEndElement();
+              }
+              
+              $xmlStreamWriter->writeEndElement();
+              
+              if (0 < $sitemapEntries) {
+                  file_put_contents($this->projectsDir . '/' . $this->projectName . '/docroot/sitemap.xml', $xmlStreamWriter->asXML());
+                  $this->log('Added Google sitemap for project ' . $this->projectName . ' with ' . $sitemapEntries . ' entries.');
+              } else {
+                  $this->log('No routes found for project ' . $this->projectName . ', did not generate Google sitemap.');
+              }
+          }
+      }
+    ]]></adhoc-task>
+    <foreach list="${projects}" param="stubbles.project" target="generate-sitemaps-project"/>
+  </target>
+
+  <target name="generate-sitemaps-project" description="Creates a Google sitemap for a single project.">
+    <generate-sitemap projectsDir="${stubbles.projects.path}" projectName="${stubbles.project}"/>
+  </target>
+  
+  <target name="check-style" description="Check coding standards.">
+    <echo>----------------------------------</echo>
+    <echo>| Checking CS of source files    |</echo>
+    <echo>----------------------------------</echo>
+    <echo message="'check-style.path' is set to '${check-style.path}'"/>
+    <echo message="'check-style.namespace' is set to '${check-style.namespace}' ('' = all)"/>
+    <echo message="'check-style.report.file' is set to '${check-style.report.file}'"/>
+    <if>
+      <!-- trim whitespace if default value is used and setup-properties wasn't executed -->
+      <equals arg1="${check-style.namespace}" arg2=" "/>
+      <then>
+        <php expression="trim('${check-style.namespace}');" returnProperty="check-style.namespace"/>
+      </then>
+    </if>
+    <phpcodesniffer
+      standard="Stubbles"
+      file="${project.basedir}/src/${check-style.path}/php/${check-style.namespace}"
+      ignorePatterns="stubbles"
+      allowedFileExtensions="php">
+      <formatter type="checkstyle" outfile="${check-style.report.file}"/>
+      <formatter type="summary" usefile="false"/>
+    </phpcodesniffer>  
+  </target>
+  
+  <target name="phplint" description="Run PHP syntax check.">
+    <echo>----------------------------------</echo>
+    <echo>| Running PHP syntax check       |</echo>
+    <echo>----------------------------------</echo>
+    <phplint>
+      <fileset refid="srcfiles"/>
+    </phplint>
+  </target>
+  
+  <target name="phpcpd" description="Run PHP copy/paste detection.">
+    <echo>------------------------------------</echo>
+    <echo>| Running PHP copy/paste detection |</echo>
+    <echo>------------------------------------</echo>
+    <phpcpd>
+      <fileset refid="srcfiles"/>
+      <formatter type="pmd" outfile="${phpcpd.report.file}"/>
+    </phpcpd>
+  </target>
+  
+  <target name="phpmd" description="Run PHP mess detection.">
+    <echo>------------------------------</echo>
+    <echo>| Running PHP mess detection |</echo>
+    <echo>------------------------------</echo>
+    <phpmd rulesets="${phpmd.report.rulesets}">
+      <fileset refid="srcfiles"/>
+      <formatter type="xml" outfile="${stubbles.report.dir}/pmd.xml"/>
+      <formatter type="html" outfile="${stubbles.report.dir}/pmd.html"/>
+    </phpmd>
+  </target>
+
+  <target name="test" depends="clear-cache" description="Run tests.">
+    <delete>
+      <fileset dir="${stubbles.report.dir}">
+        <include name="**/*"/>
+        <!-- check-style target is running before test in test-all so we have to exclude this file -->
+        <exclude name="**/checkstyle.xml"/>
+        <exclude name="coverage"/>
+      </fileset>
+    </delete>
+    <delete>
+      <fileset dir="${stubbles.report.dir}/coverage">
+        <include name="**"/>
+      </fileset>
+    </delete>
+    <echo message="'phpunit.test.groups' is set to '${phpunit.test.groups}' ('' = all)"/>
+    <echo message="'phpunit.test.excludeGroups' is set to '${phpunit.test.excludeGroups}' ('' = none)"/>
+    <php expression="define('TEST_SRC_PATH', '${project.basedir}/src/test');"/>
+    <php expression="require_once '${project.basedir}/bootstrap.php';"/>
+    <php expression="stubBootstrap::init('${project.basedir}/${application.init-path}');"/>
+    <php expression="extension_loaded('xdebug');" returnProperty="xdebug"/>
+    <if>
+      <and>
+        <istrue value="${xdebug}"/>
+        <istrue value="${phpunit.test.coverage}"/>
+      </and>
+      <then>
+        <coverage-setup database="${stubbles.report.dir}/coverage/coverage.db">
+          <fileset refid="srcfiles"/>
+        </coverage-setup>
+        <phpunit codecoverage="true"
+                 groups="${phpunit.test.groups}"
+                 excludeGroups="${phpunit.test.excludeGroups}">
+          <formatter type="plain" usefile="false"/>
+          <formatter type="summary" usefile="false"/>
+          <formatter todir="${stubbles.report.dir}/phpunit" type="xml"/>
+          <batchtest>
+            <fileset refid="testfiles"/>
+          </batchtest>
+        </phpunit>
+        <coverage-report outfile="${stubbles.report.dir}/coverage/coverage.xml">
+          <report todir="${stubbles.report.dir}/coverage"/>
+        </coverage-report>
+      </then>
+      <else>
+        <phpunit codecoverage="false"
+                 groups="${phpunit.test.groups}"
+                 excludeGroups="${phpunit.test.excludeGroups}">
+          <formatter type="plain" usefile="false"/>
+          <formatter type="summary" usefile="false"/>
+          <formatter todir="${stubbles.report.dir}/phpunit" type="xml"/>
+          <batchtest>
+            <fileset refid="testfiles"/>
+          </batchtest>
+        </phpunit>
+      </else>
+    </if>
+    <phpunitreport infile="${stubbles.report.dir}/phpunit/testsuites.xml" todir="${stubbles.report.dir}/phpunit"/>
+  </target>
+  
+  <target name="test-all"
+          depends="phplint, check-style, test"
+          description="Runs all significant checks and tests."/>
+  
+  <target name="continuous-integration"
+          depends="phpcpd, phpmd, create-api-doc"
+          description="Runs additional targets for an continuous integration server."/>
+  
+  <target name="create-api-doc" description="Creates API docs.">
+    <delete>
+      <fileset dir="${project.basedir}/docs/api">
+        <include name="**/*"/>
+      </fileset>
+    </delete>
+    <phpdoc title="${phing.project.name}"
+            destdir="${project.basedir}/docs/api"
+            sourcecode="yes"
+            output="HTML:frames:DOM/earthli"
+            defaultpackagename="${application.default-package-name}">
+      <fileset refid="srcfiles"/>
+    </phpdoc>
+  </target>
+
+  <target name="create-processable" description="Creates a processable for the XML/XSL view engine">
+    <input propertyname="processable.package.name" promptChar=":">Please enter the name of the package to create the processable in</input>
+    <php expression="'php/' . str_replace('::', '/', '${processable.package.name}');" returnProperty="processable.package.dir"/>
+    <if>
+      <not>
+        <available file="src/main/${processable.package.dir}" type="dir"/>
+      </not>
+      <then>
+        <input propertyname="processable.package.create" promptChar=":">Package ${processable.package.name} does not exist. Create it?</input>
+        <if>
+          <equals arg1="${processable.package.create}" arg2="Y" casesensitive="false"/>
+          <then>
+            <mkdir dir="src/main/${processable.package.dir}" />
+          </then>
+          <else>
+            <fail message="Operation cancelled, package not created." />
+          </else>
+        </if>
+      </then>
+    </if>
+    <if>
+      <not>
+        <available file="src/test/${processable.package.dir}" type="dir"/>
+      </not>
+      <then>
+        <mkdir dir="src/test/${processable.package.dir}" />
+      </then>
+    </if>
+    <input propertyname="processable.package.class" promptChar=":">Please enter the name of the processable class to create</input>
+    <if>
+      <available file="src/main/${processable.package.dir}/${processable.package.class}.php" type="file"/>
+      <then>
+        <fail message="Class ${processable.package.name}::${processable.package.class} already exists!" />
+      </then>
+      <else>
+        <append destFile="src/main/${processable.package.dir}/${processable.package.class}.php"><filterchain><expandproperties /></filterchain>&lt;?php
+/**
+ * Description of ${processable.package.name}::${processable.package.class}
+ *
+ * @package
+ * @subpackage
+ * @version     $Id$
+ */
+stubClassLoader::load('net::stubbles::webapp::xml::route::stubAbstractProcessable');
+/**
+ * Description of ${processable.package.name}::${processable.package.class}
+ *
+ * @package
+ * @subpackage
+ */
+class ${processable.package.class} extends stubAbstractProcessable
+{
+    /**
+     * checks whether processable is cachable or not
+     *
+     * @return  bool
+     */
+    public function isCachable()
+    {
+        return true;
+    }
+
+    /**
+     * returns a list of variables that have an influence on caching
+     *
+     * @return  array&lt;string,scalar&gt;
+     */
+    public function getCacheVars()
+    {
+        return array();
+    }
+
+    /**
+     * processes the processable
+     *
+     * @return  mixed
+     */
+    public function process()
+    {
+        return 'something';
+    }
+}
+?&gt;</append>
+          <if>
+            <not>
+              <available file="src/test/${processable.package.dir}/${processable.package.class}.php" type="file"/>
+            </not>
+            <then>
+              <php expression="strtolower(substr('${processable.package.class}', 0, 1)) . substr('${processable.package.class}', 1);" returnProperty="processable.test.instance"/>
+              <append destFile="src/test/${processable.package.dir}/${processable.package.class}TestCase.php"><filterchain><expandproperties /></filterchain>&lt;?php
+/**
+ * Test for ${processable.package.name}::${processable.package.class}.
+ *
+ * @package
+ * @subpackage
+ * @version     $Id$
+ */
+stubClassLoader::load('${processable.package.name}::${processable.package.class}');
+/**
+ * Test for ${processable.package.name}::${processable.package.class}.
+ *
+ * @package
+ * @subpackage
+ * @group
+ */
+class ${processable.package.class}TestCase extends PHPUnit_Framework_TestCase
+{
+    /**
+     * instance to test
+     *
+     * @var  ${processable.package.class}
+     */
+    protected $${processable.test.instance};
+
+    /**
+     * set up test environment
+     */
+    public function setUp()
+    {
+        $this->${processable.test.instance} = new ${processable.package.class}();
+    }
+
+    /**
+     * @test
+     */
+    public function isAlwaysCachable()
+    {
+        $this->assertTrue($this->${processable.test.instance}->isCachable());
+    }
+
+    /**
+     * @test
+     */
+    public function hasNoCacheVars()
+    {
+        $this->assertEquals(array(),
+                            $this->${processable.test.instance}->getCacheVars()
+        );
+    }
+
+    /**
+     * @test
+     */
+    public function doesReturnSomethingOnProcess()
+    {
+        $this->assertEquals('something',
+                            $this->${processable.test.instance}->process()
+        );
+    }
+}
+?&gt;</append>
+            </then>
+          </if>
+        </else>
+      </if>
+  </target>
+</project>

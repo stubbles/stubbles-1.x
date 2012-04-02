@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<parts
+    xmlns:stub="http://stubbles.net/stub"
+    xmlns:ixsl="http://www.w3.org/1999/XSL/Transform"
+    exclude-result-prefixes="stub ixsl">
+  <part name="content">
+
+    <!-- This comment is not visible in the output -->
+    <stub:comment>This will create an HTML comment that is visible in the output.</stub:comment>
+
+    <h1>Stubbles XML/XSL example</h1>
+
+    <div>
+      <p>Welcome to the Stubbles example page using the XML/XSL processor.</p>
+      <p>This processor has been inspired by the Java Framework <a href="http://pustefix.oss.schlund.de" target="_blank">Pustefix</a>.</p>
+      <p>Take a look at <tt>examples/config/xml/pages/txt/main_index.xml</tt> to see how this page is created.</p>
+      <p>Documentation for this component can be found at <a href="http://www.stubbles.net/wiki/Docs/MVC/XSL">http://www.stubbles.net/wiki/Docs/MVC/XSL</a>,
+      documentation for the templates at <a href="http://www.stubbles.net/wiki/Docs/MVC/XSL/Templates">http://www.stubbles.net/wiki/Docs/MVC/XSL/Templates</a>.</p>
+
+      <!-- This is an include in the same document -->
+      <stub:include part="caching"/>
+      <stub:include part="resources"/>
+
+      <!-- test a link -->
+      <stub:link page="test">
+        <stub:argument name="argument">wert</stub:argument>
+        <stub:argument name="argument2">noch_ein_wert</stub:argument>
+        Test
+      </stub:link>
+      <p>The current date is <stub:date format="Y-m-d"/>. Localized: <stub:localeDate format="%d %b %Y"/>.</p>
+      <p>A given date is <stub:date format="Y-m-d" timestamp="1214222717"/>. Localized: <stub:localeDate format="%d %b %Y" timestamp="1214222717"/>.</p>
+    </div>
+  </part>
+
+  <part name="caching">
+    <h1>Example for page element data</h1>
+    <p>
+      This example shows how data can be used from the <a href="?showLastRequestXML=1" target="_blank">DOM-tree</a>.
+    </p>
+    <p>Element data: <ixsl:value-of select="document/uncached/currentTime"/></p>
+  </part>
+
+  <part name="resources">
+    <h1>Example for resources</h1>
+    <p>
+      This example shows how a resource can be used to easily store any kind of
+      data in the session without having to touch the stubSession interface.
+    </p>
+    <p>Current counter value : <ixsl:value-of select="document/resources/counter/count/text()"/></p>
+  </part>
+
+</parts>

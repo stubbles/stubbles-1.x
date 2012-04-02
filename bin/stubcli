@@ -1,0 +1,25 @@
+#!/usr/bin/php
+<?php
+/**
+ * Script to execute an implementation of net::stubbles::console::stubConsoleCommand.
+ *
+ * @package     stubbles
+ * @subpackage  console
+ * @version     $Id: stubcli 3263 2011-12-05 12:29:32Z mikey $
+ */
+if (isset($argv[1]) === false) {
+    echo "*** Please name the project to execute the command for.\n";
+    exit(1);
+}
+
+$projectPath = dirname(__FILE__) . '/../projects/' . $argv[1];
+if (file_exists($projectPath) === false) {
+    echo '*** The project ' . $argv[1] . " does not exist.";
+    exit(1); 
+}
+
+require dirname(__FILE__) . '/../bootstrap.php';
+stubBootstrap::init($projectPath);
+stubClassLoader::load('net::stubbles::console::stubConsoleCommandRunner');
+exit(stubConsoleCommandRunner::main($projectPath, $argv));
+?>

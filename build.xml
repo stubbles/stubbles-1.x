@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="Stubbles" default="main">
+  <property file="build.properties"/>
+
+  <path id="phing.tasks.classpath">
+    <pathelement dir="${stubbles.base.dir}/src/main/php/org/stubbles/phing/tasks"/>
+  </path>
+  
+  <fileset id="srcfiles" dir="${stubbles.base.dir}/src/main/php">
+    <include name="**/*.php"/>
+    <exclude name="**/org/**"/>
+  </fileset>
+  
+  <fileset id="testfiles" dir="${stubbles.base.dir}/src/test/php">
+    <include name="**/*TestCase*.php"/>
+  </fileset>
+
+  <taskdef name="buildStar" classname="star.StarWriterTask"/>
+  <typedef name="starDecorator" classname="star.StarDecorator"/>
+
+  <target name="main" if="version" depends="test-all, build"/>
+
+  <target name="build" if="version" depends="versioncheck,copy-files,build-archives,tar"/>
+
+  <target name="versioncheck" unless="version">
+    <php function="file_get_contents" returnProperty="version">
+      <param value="VERSION"/>
+    </php>
+    <php function="trim" returnProperty="version">
+      <param value="${version}"/>
+    </php>
+    <echo>Version to be build: ${version}</echo>
+    <property name="pkg.name" value="stubbles-${version}" override="true"/>
+    <property name="build.src.dir" value="${build.base.dir}/${pkg.name}" override="true"/>
+  </target>
+
+  <target name="copy-files">
+    <echo>-----------------------------</echo>
+    <echo>| Creating directory layout |</echo>
+    <echo>-----------------------------</echo>
+    <delete dir="${build.src.dir}"/>
+    <copy file="${stubbles.base.dir}/bootstrap.php" tofile="${build.src.dir}/bootstrap.php"/>
+    <copy file="${stubbles.base.dir}/LICENSE" tofile="${build.src.dir}/LICENSE"/>
+    <append destFile="${build.src.dir}/VERSION">Stubbles version ${version}</append>
+
+    <mkdir dir="${build.src.dir}/bin"/>
+    <copy file="${stubbles.base.dir}/bin/stubcli" tofile="${build.src.dir}/bin/stubcli"/>
+    
+    <mkdir dir="${build.src.dir}/projects"/>
+    <copy todir="${build.src.dir}/projects/common">
+      <fileset dir="${stubbles.base.dir}/projects/common">
+        <include name="**/*"/>
+        <exclude name="**/Thumbs.db"/>
+      </fileset>
+    </copy>
+    <copy todir="${build.src.dir}/projects/dist">
+      <fileset dir="${stubbles.base.dir}/projects/dist">
+        <include name="cache"/>
+        <include name="config/**"/>
+        <include name="docroot/**"/>
+        <include name="log"/>
+        <include name="pages/**"/>
+        <exclude name="pages/conf/*.xml"/>
+        <exclude name="**/Thumbs.db"/>
+        <exclude name="docroot/index.php"/>
+      </fileset>
+    </copy>
+
+    <mkdir dir="${build.src.dir}/projects/common/docroot/script"/>
+    <copy todir="${build.src.dir}/projects/common/docroot/script">
+      <fileset dir="${stubbles.base.dir}/src/main/javascript">
+        <include name="**/*.js"/>
+      </fileset>
+    </copy>
+
+    <mkdir dir="${build.src.dir}/lib"/>
+    <mkdir dir="${build.src.dir}/docs"/>
+    <mkdir dir="${build.src.dir}/docs/api"/>
+    <mkdir dir="${build.src.dir}/docs/reports"/>
+    <mkdir dir="${build.src.dir}/docs/reports/coverage"/>
+    <mkdir dir="${build.src.dir}/docs/reports/phpunit"/>
+
+    <mkdir dir="${build.src.dir}/src/main/php"/>
+    <mkdir dir="${build.src.dir}/src/main/resources"/>
+    <mkdir dir="${build.src.dir}/src/test/php"/>
+    <mkdir dir="${build.src.dir}/src/test/resources"/>
+
+    <!-- Copy Phing tasks that can be used in Stubbles build files -->
+    <echo>-----------------------------</echo>
+    <echo>| Setting up build system   |</echo>
+    <echo>-----------------------------</echo>
+    <copy file="${stubbles.base.dir}/src/main/resources/phing/build.xml" tofile="${build.src.dir}/build-dist.xml"/>
+    <copy file="${stubbles.base.dir}/src/main/resources/phing/build-stubbles.xml" tofile="${build.src.dir}/build-stubbles.xml"/>
+    <copy file="${stubbles.base.dir}/src/main/resources/phing/build-project.xml" tofile="${build.src.dir}/build-project.xml"/>
+    <copy file="${stubbles.base.dir}/src/main/resources/phing/stubbles.sh" tofile="${build.src.dir}/stubbles.sh">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </copy>
+    <chmod file="${build.src.dir}/stubbles.sh" mode="0755"/>
+    <copy file="${stubbles.base.dir}/src/main/resources/phing/stubbles.bat" tofile="${build.src.dir}/stubbles.bat">
+      <filterchain>
+        <expandproperties/>
+      </filterchain>
+    </copy>
+  </target>
+
+  <target name="build-archives" depends="versioncheck" if="version">
+    <echo>-----------------------------</echo>
+    <echo>| Creating star files       |</echo>
+    <echo>-----------------------------</echo>
+    <echo message="Base directory  : ${stubbles.base.dir}"/>
+    <echo message="Source directory: ${build.src.dir}"/>
+    <php expression="file_get_contents('${stubbles.base.dir}/src/main/php/net/stubbles/stubClassLoader.php')" returnProperty="stubClassLoader"/>
+    <buildStar buildPath="${build.src.dir}/lib/stubbles.php"
+         version="${version}"
+         title="Stubbles"
+         package="net::stubbles"
+         author="Stubbles Development Team &lt;http://stubbles.net&gt;"
+         copyright="Stubbles Development Team"
+         preface="${stubClassLoader}"
+         baseSrcPath="${stubbles.base.dir}/src/main">
+      <fileset dir="${stubbles.base.dir}/src/main">
+        <include name="**/*.php"/>
+        <include name="**/*.xml"/>
+        <include name="**/*.ini"/>
+        <include name="**/*.xsl"/>
+        <exclude name="**/org/stubbles/phing/**"/>
+        <exclude name="**/org/stubbles/test/**"/>
+        <exclude name="**/stubClassLoader.php"/>
+        <exclude name="**/todo/**"/>
+        <exclude name="resources/phing/**"/>
+      </fileset>
+    </buildStar>
+  </target>
+
+  <target name="tar">
+    <echo>-----------------------------</echo>
+    <echo>| Creating TAR packages     |</echo>
+    <echo>-----------------------------</echo>
+    <property name="tgzfile" value="${build.base.dir}/${pkg.name}.tgz"/>
+    <delete file="${tgzfile}"/>
+    <tar compression="gzip" destFile="${tgzfile}" basedir="${build.base.dir}">
+      <fileset dir="${build.base.dir}">
+        <include name="${pkg.name}/**"/>
+      </fileset>
+    </tar>
+  </target>
+
+  <target name="test" depends="clear-cache" description="Run tests.">
+    <delete>
+      <fileset dir="${stubbles.report.dir}">
+        <include name="**/*"/>
+        <!-- check-style target is running before test in test-all so we have to exclude this file -->
+        <exclude name="**/checkstyle.xml"/>
+      </fileset>
+    </delete>
+    <delete includeemptydirs="true">
+      <fileset dir="${stubbles.report.dir}/coverage">
+        <include name="**"/>
+      </fileset>
+    </delete>
+    <echo message="'phpunit.test.groups' is set to '${phpunit.test.groups}' ('' = all)"/>
+    <echo message="'phpunit.test.excludeGroups' is set to '${phpunit.test.excludeGroups}' ('' = none)"/>
+    <php expression="ini_set('memory_limit', -1);"/>
+    <php expression="define('TEST_SRC_PATH', '${stubbles.base.dir}/src/test');"/>
+    <php expression="require_once TEST_SRC_PATH . '/../../bootstrap.php';"/>
+    <php expression="require_once 'star/starReader.php';"/>
+    <php expression="StarClassRegistry::addLibPath(stubBootstrap::getRootPath() . '/lib');"/>
+    <php expression="stubBootstrap::init(stubBootstrap::getRootPath() . '/projects/dist', '/../src/main/php/net/stubbles/stubClassLoader.php');"/>
+    <php expression="extension_loaded('xdebug');" returnProperty="xdebug"/>
+    <if>
+      <and>
+        <istrue value="${xdebug}"/>
+        <istrue value="${phpunit.test.coverage}"/>
+      </and>
+      <then>
+        <coverage-setup database="${stubbles.report.dir}/coverage/coverage.db">
+          <fileset refid="srcfiles"/>
+        </coverage-setup>
+        <phpunit codecoverage="true"
+                 groups="${phpunit.test.groups}"
+                 excludeGroups="${phpunit.test.excludeGroups}">
+          <formatter type="plain" usefile="false"/>
+          <formatter type="summary" usefile="false"/>
+          <formatter todir="${stubbles.report.dir}/phpunit" type="xml"/>
+          <batchtest>
+            <fileset refid="testfiles"/>
+          </batchtest>
+        </phpunit>
+        <coverage-report outfile="${stubbles.report.dir}/coverage/coverage.xml">
+          <report todir="${stubbles.report.dir}/coverage"/>
+        </coverage-report>
+      </then>
+      <else>
+        <phpunit codecoverage="false"
+                 groups="${phpunit.test.groups}"
+                 excludeGroups="${phpunit.test.excludeGroups}">
+          <formatter type="plain" usefile="false"/>
+          <formatter type="summary" usefile="false"/>
+          <formatter todir="${stubbles.report.dir}/phpunit" type="xml"/>
+          <batchtest>
+            <fileset refid="testfiles"/>
+          </batchtest>
+        </phpunit>
+      </else>
+    </if>
+    <phpunitreport infile="${stubbles.report.dir}/phpunit/testsuites.xml" todir="${stubbles.report.dir}/phpunit"/>
+  </target>
+
+  <target name="check-style" description="Check coding standards.">
+    <echo>----------------------------------</echo>
+    <echo>| Checking CS of source files    |</echo>
+    <echo>----------------------------------</echo>
+    <echo message="'check-style.path' is set to '${check-style.path}'"/>
+    <echo message="'check-style.namespace' is set to '${check-style.namespace}' ('' = all)"/>
+    <phpcodesniffer
+      standard="Stubbles"
+      file="${stubbles.base.dir}/src/${check-style.path}/php/${check-style.namespace}"
+      ignorePatterns="stubbles"
+      allowedFileExtensions="php">
+      <formatter type="checkstyle" outfile="${check-style.report.file}"/>
+      <formatter type="summary" usefile="false"/>
+    </phpcodesniffer>  
+  </target>
+  
+  <target name="phplint" description="Run PHP syntax check.">
+    <echo>----------------------------------</echo>
+    <echo>| Running PHP syntax check       |</echo>
+    <echo>----------------------------------</echo>
+    <phplint>
+      <fileset refid="srcfiles"/>
+    </phplint>
+  </target>
+  
+  <target name="phpcpd" description="Run PHP copy/paste detection.">
+    <echo>------------------------------------</echo>
+    <echo>| Running PHP copy/paste detection |</echo>
+    <echo>------------------------------------</echo>
+    <php expression="ini_set('memory_limit', -1);"/>
+    <phpcpd>
+      <fileset refid="srcfiles"/>
+      <formatter type="pmd" outfile="${phpcpd.report.file}"/>
+    </phpcpd>
+  </target>
+  
+  <target name="phpmd" description="Run PHP mess detection.">
+    <echo>------------------------------</echo>
+    <echo>| Running PHP mess detection |</echo>
+    <echo>------------------------------</echo>
+    <php expression="ini_set('memory_limit', -1);"/>
+    <phpmd rulesets="${phpmd.report.rulesets}">
+      <fileset refid="srcfiles"/>
+      <formatter type="xml" outfile="${stubbles.report.dir}/pmd.xml"/>
+      <formatter type="html" outfile="${stubbles.report.dir}/pmd.html"/>
+    </phpmd>
+  </target>
+  
+  <target name="test-all"
+          depends="phplint, check-style, test"
+          description="Runs all significant checks and tests."/>
+  
+  <target name="continuous-integration"
+          depends="main, phpcpd, phpmd, create-api-doc"
+          description="Runs all needed targets for an continuous integration server."/>
+
+  <target name="create-api-doc" description="Creates API docs">
+    <delete>
+      <fileset dir="${stubbles.base.dir}/docs/api">
+        <include name="**/*"/>
+      </fileset>
+    </delete>
+    <phpdoc title="Stubbles"
+            destdir="${stubbles.base.dir}/docs/api"
+            sourcecode="yes"
+            output="HTML:frames:DOM/earthli"
+            defaultpackagename="stubbles">
+      <fileset refid="srcfiles"/>
+    </phpdoc>
+  </target>
+
+  <target name="clear-cache" description="Clears all cache files.">
+    <delete file="${stubbles.base.dir}/lib/.cache" verbose="true"/>
+    <delete>
+      <fileset dir="projects">
+        <include name="**/cache/**"/>
+      </fileset>
+    </delete>
+  </target>
+</project>

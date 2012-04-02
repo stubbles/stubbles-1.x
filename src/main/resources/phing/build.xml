@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="${application.installation.name}" default="main">
+  <property name="application.default-package-name" value="${application.installation.default-package-name}"/>
+  <property name="application.init-path" value="projects/${application.installation.first-project}"/>
+  <import file="build-stubbles.xml"/>
+  <import file="build-project.xml"/>
+
+  <!--
+    Add your own phing tasks in this target.
+  -->
+  <target name="main" depends="test-all, clear-cache, generate-clients, generate-sitemaps" description="Build project."/>
+</project>

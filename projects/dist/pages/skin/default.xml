@@ -1,0 +1,10 @@
+<stub:document xmlns:stub="http://stubbles.net/stub">
+  <html>
+    <head>
+      <title>Default-Skin</title>
+    </head>
+    <body>
+      <stub:maincontent part="content" path=""/>
+    </body>
+  </html>
+</stub:document>

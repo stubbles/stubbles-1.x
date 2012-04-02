@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project name="Stubbles Project" default="main">
+  <property name="stubbles.lib.path" value="${project.basedir}/lib"/>
+  <property name="stubbles.projects.path" value="${project.basedir}/projects"/>
+  <property name="stubbles.src.path" value="${project.basedir}/src/main"/>
+
+  <target name="setup-project"
+          depends="init, projectcopy, setup-dirs, setup-json-rpc, setup-webapp"
+          description="Create a new project within installation.">
+    <echo>The new project ${stubbles.project} has been set up correctly</echo>
+    <echo>You may now adjust the configuration files in ${stubbles.project.path}/config</echo>
+    <echo>If you finished adjusting configuration files, please run "phing"</echo>
+  </target>
+
+  <target name="init" unless="stubbles.project" description="Base initialization.">
+    <echo>----------------------------------</echo>
+    <echo>| Setting up new project         |</echo>
+    <echo>----------------------------------</echo>
+    <input propertyname="stubbles.project" promptChar=":">Please enter the name of the project</input>
+    <property name="stubbles.project.path" value="${stubbles.projects.path}/${stubbles.project}"/>
+    <if>
+      <available file="${stubbles.project.path}" type="dir"/>
+      <then>
+        <fail message="Project ${stubbles.project} already exists!"/>
+      </then>
+    </if>
+  </target>
+
+  <target name="projectcopy" unless="stubbles.project.copy">
+    <input propertyname="stubbles.project.copy" promptChar=":" defaultValue="dist">Please enter the name of the project to copy from</input>
+    <if>
+      <not>
+        <available file="${stubbles.projects.path}/${stubbles.project.copy}" type="dir"/>
+      </not>
+      <then>
+        <fail message="Project ${stubbles.project.copy} does not exist!"/>
+      </then>
+    </if>
+  </target>
+
+  <target name="setup-dirs" description="Setup basic directories.">
+    <mkdir dir="${stubbles.project.path}/cache"/>
+    <mkdir dir="${stubbles.project.path}/config"/>
+    <mkdir dir="${stubbles.project.path}/log"/>
+    <mkdir dir="${stubbles.project.path}/log/errors"/>
+    <input propertyname="copy.config" promptChar="?" defaultValue="Y">Do you want to config files? (Y/N)</input>
+    <if>
+      <equals arg1="${copy.config}" arg2="Y" casesensitive="false"/>
+      <then>
+        <copy todir="${stubbles.project.path}/config">
+          <fileset dir="${stubbles.projects.path}/${stubbles.project.copy}/config">
+            <include name="*.ini"/>
+            <exclude name="json-rpc-service.ini"/>
+          </fileset>
+        </copy>
+      </then>
+      <else>
+        <echo>Config files skipped.</echo>
+      </else>
+    </if>
+  </target>
+
+  <target name="setup-webapp" description="Basic setup for webapp functionality">
+    <mkdir dir="${stubbles.project.path}/pages"/>
+    <input propertyname="copy.pages" promptChar="?" defaultValue="Y">Do you want to copy route configurations? (Y/N)</input>
+    <if>
+      <equals arg1="${copy.pages}" arg2="Y" casesensitive="false"/>
+      <then>
+        <copy todir="${stubbles.project.path}/pages">
+          <fileset dir="${stubbles.projects.path}/${stubbles.project.copy}/pages">
+            <include name="**/**"/>
+          </fileset>
+        </copy>
+      </then>
+      <else>
+        <echo>Route configurations skipped.</echo>
+      </else>
+    </if>
+    <copy file="${stubbles.projects.path}/${stubbles.project.copy}/config/errors/500.html" tofile="${stubbles.project.path}/config/errors/500.html" overwrite="true"/>
+    <input propertyname="variantmanager.enabled" promptChar="?" defaultValue="Y">Do you want to enable variant manager functionality? (Y/N)</input>
+    <if>
+      <equals arg1="${variantmanager.enabled}" arg2="Y" casesensitive="false"/>
+      <then>
+        <echo>-------------------------------------</echo>
+        <echo>| Setting up VariantManager package |</echo>
+        <echo>-------------------------------------</echo>
+        <copy file="${stubbles.projects.path}/${stubbles.project.copy}/config/variantmanager.xml" tofile="${stubbles.project.path}/config/variantmanager.xml" overwrite="true"/>
+        <property name="variantmanager.preintercept" value="->addVariantsPreInterceptor()"/>
+      </then>
+      <else>
+        <property name="variantmanager.preintercept" value=""/>
+        <echo>Variant manager initialization skipped.</echo>
+      </else>
+    </if>
+    <mkdir dir="${stubbles.project.path}/docroot"/>
+    <input propertyname="copy.docroot" promptChar="?" defaultValue="Y">Do you want to copy document root contents? (Y/N)</input>
+    <if>
+      <equals arg1="${copy.docroot}" arg2="Y" casesensitive="false"/>
+      <then>
+        <copy todir="${stubbles.project.path}/docroot">
+          <fileset dir="${stubbles.projects.path}/${stubbles.project.copy}/docroot">
+            <include name="**"/>
+            <exclude name="index.php"/>
+          </fileset>
+        </copy>
+      </then>
+      <else>
+        <copy file="${stubbles.projects.path}/${stubbles.project.copy}/docroot/.htaccess" tofile="${stubbles.project.path}/docroot/.htaccess"/>
+      </else>
+    </if>
+    <input propertyname="main.package.name" promptChar=":">Please enter the name of the package to create the main class in</input>
+    <php expression="'php/' . str_replace('::', '/', '${main.package.name}');" returnProperty="main.package.dir"/>
+    <if>
+      <not>
+        <available file="src/main/${main.package.dir}" type="dir"/>
+      </not>
+      <then>
+         <mkdir dir="src/main/${main.package.dir}" />
+      </then>
+    </if>
+    <if>
+      <not>
+        <available file="src/test/${main.package.dir}" type="dir"/>
+      </not>
+      <then>
+        <mkdir dir="src/test/${main.package.dir}" />
+      </then>
+    </if>
+    <input propertyname="main.package.class" promptChar=":">Please enter the name of the main class to create</input>
+    <if>
+      <available file="src/main/${main.package.dir}/${main.package.class}.php" type="file"/>
+      <then>
+        <fail message="Class ${main.package.name}::${main.package.class} already exists!" />
+      </then>
+      <else>
+        <append destFile="src/main/${main.package.dir}/${main.package.class}.php"><filterchain><expandproperties /></filterchain>&lt;?php
+/**
+ * Main application class.
+ *
+ * @package
+ * @subpackage
+ */
+stubClassLoader::load('net::stubbles::ioc::module::stubModeBindingModule',
+                      'net::stubbles::webapp::stubUriConfigurator',
+                      'net::stubbles::webapp::stubWebApp'
+);
+/**
+ * Main application class.
+ *
+ * @package
+ * @subpackage
+ */
+class ${main.package.class} extends stubWebApp
+{
+    /**
+     * returns list of bindings required for this web app
+     *
+     * @param   string                           $projectPath
+     * @return  array&lt;string|stubBindingModule&gt;
+     */
+    public static function __bindings($projectPath)
+    {
+        return array(self::createModeBindingModule(),
+                     self::createPropertiesBindingModule($projectPath),
+                     self::createIpoBindingModule(),
+                     self::createLogBindingModule(),
+                     self::createWebAppBindingModule(self::createXmlUriConfigurator()
+                                                         ${json.rpc}
+                                                         ->addShowLastXmlPreInterceptor()
+                                                         ${variantmanager.preintercept}
+                                                         ->addEtagPostInterceptor()
+                           )
+
+        );
+    }
+}
+?&gt;</append>
+        <if>
+          <not>
+            <available file="src/test/${main.package.dir}/${main.package.class}.php" type="file"/>
+          </not>
+          <then>
+            <append destFile="src/test/${main.package.dir}/${main.package.class}TestCase.php"><filterchain><expandproperties /></filterchain>&lt;?php
+/**
+ * Test for ${main.package.name}::${main.package.class}.
+ *
+ * @package
+ * @subpackage  test
+ */
+stubClassLoader::load('${main.package.name}::${main.package.class}',
+                      'net::stubbles::ioc::stubApp'
+);
+/**
+ * Test for ${main.package.name}::${main.package.class}.
+ *
+ * @package
+ * @subpackage  test
+ * @group       main
+ */
+class ${main.package.class}TestCase extends PHPUnit_Framework_TestCase
+{
+    /**
+     * @test
+     */
+    public function canCreateListOfBindingModules()
+    {
+        $bindings = ${main.package.class}::__bindings('/tmp');
+        $this->assertInternalType('array', $bindings);
+        $this->assertGreaterThan(0, count($bindings));
+    }
+
+    /**
+     * @test
+     */
+    public function canCreateInstance()
+    {
+        $this->assertInstanceOf('${main.package.class}',
+                                stubApp::createInstance('${main.package.name}::${main.package.class}',
+                                                        stubBootstrap::getRootPath() . '/projects/${stubbles.project}'
+                                         )
+        );
+    }
+}
+?&gt;</append>
+          </then>
+        </if>
+      </else>
+    </if>
+    <append destFile="${stubbles.project.path}/docroot/index.php"><filterchain><expandproperties /></filterchain>&lt;?php
+/**
+ * Bootstrap file for web applications.
+ *
+ * @package  stubbles
+ */
+require '../../../bootstrap.php';
+stubBootstrap::run('${main.package.name}::${main.package.class}', '${stubbles.project}');
+?&gt;</append>
+  </target>
+
+  <target name="setup-json-rpc" description="Basic setup for JSON-RPC functionality.">
+    <input propertyname="enable.json.rpc" promptChar="?" defaultValue="Y">Do you want to enable JSON-RPC functionality? (Y/N)</input>
+    <if>
+      <equals arg1="${enable.json.rpc}" arg2="Y" casesensitive="false"/>
+      <then>
+        <echo>----------------------------------</echo>
+        <echo>| Setting up JSON-RPC package    |</echo>
+        <echo>----------------------------------</echo>
+        <append destFile="${stubbles.project.path}/config/json-rpc-service.ini"><filterchain><expandproperties/></filterchain>&lt;?php
+[config]
+namespace = "stubbles.json.proxy"
+genjsdir = "script/generated"
+
+[classmap]
+</append>
+        <property name="json.rpc" value="->provideJsonRpc()"/>
+      </then>
+      <else>
+        <property name="json.rpc" value=""/>
+        <echo>No JSON-RPC config file to copy.</echo>
+      </else>
+    </if>
+  </target>
+</project>

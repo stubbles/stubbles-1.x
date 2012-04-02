@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xj:configuration
+    xmlns:xj="http://xjconf.net/XJConf"
+    xmlns="http://stubbles.net/websites">
+  <route>
+    <property name="skin" value="default"/>
+    <property name="title" value="Übersicht"/>
+    <processable name="Test" type="org::stubbles::examples::processables::TestProcessable"/>
+    <processable name="uncached" type="org::stubbles::examples::processables::CurrentTimeProcessable"/>
+  </route>
+</xj:configuration>

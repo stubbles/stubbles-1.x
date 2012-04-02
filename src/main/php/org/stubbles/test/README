@@ -1,0 +1,2 @@
+This folder contains classes to be used in tests only, mainly for the test of
+the net::stubbles::stubClassLoader class.

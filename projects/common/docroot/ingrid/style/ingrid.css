@@ -1,0 +1,275 @@
+#content .container_box {
+  padding: 0 25px 25px 25px;
+}
+
+#content .container_box .container_form {
+  position: relative;
+  font-family: Arial,Helvetica,Verdana,Sans-Serif;
+  font-size: 13px;
+}
+
+#content .container_box .container_form select.pv {
+  display: none;
+}
+
+#content .container_box .container_form ul {
+	list-style: none;
+}
+
+#content .container_box .container_form ul li {
+	padding: 0 0 3px 0;
+  vertical-align: top;
+	margin: 0;
+	width: 100%;
+  position: relative;
+}
+
+#content .container_box .container_form ul li.last {
+	padding-bottom: 0;
+}
+
+#content .container_box .container_form ul li.done {
+	display: none;
+}
+
+#content .container_box .container_form ul li.visible {
+	display: block;
+}
+
+#content .container_box .container_form ul li.bottomspace {
+	padding-bottom: 10px;
+}
+
+#content .container_box .container_form ul li div.left {
+	float: left;
+	width: 165px;
+  text-align: right;
+}
+
+#content .container_box .container_form ul li div.right {
+  float: right;
+  text-align: left;
+  width: 360px;
+}
+
+#content .container_box .container_form ul li div.center {
+  text-align: center;
+}
+
+#content .container_box .container_form ul li .inline {
+	float: left; 
+	margin-right: 10px;
+}
+
+#content .container_box .container_form ul li .narrow {
+	margin-right: 3px;
+}
+
+#content .container_box .container_form ul li .nospace {
+	margin: 0;
+}
+
+#content .container_box .container_form ul li.done .inline {
+	margin-right: 5px;
+}
+
+#content .container_box .container_form ul li div.text,
+#content .container_box .container_form ul li span.text,
+#content .container_box .container_form ul li label.text {
+  color: #000;
+  display: block;
+	padding-top: 4px;
+}
+
+#content .container_box .container_form ul li small {
+  color: #677AA1;
+  display: block;
+	font-size: 11px;
+}
+
+#content .container_box .container_form ul li input.radio,
+#content .container_box .container_form ul li input.check {
+  margin-top: 5px;
+}
+
+#content .container_box .container_form ul li input.btn_submit {
+  border: solid 1px #CC0000; 
+  color: #CC0000; 
+  background-color: #fff; 
+  font-weight: bold; 
+  padding: 0 5px 3px 5px; 
+  height: 22px;
+  cursor: pointer; 
+}
+
+#content .container_box .container_form ul li input.btn_submit {
+  border: solid 1px #CC0000; 
+  color: #CC0000; 
+  background-color: #fff; 
+  font-weight: bold; 
+  padding: 0 5px 3px 5px; 
+  height: 22px;
+  cursor: pointer; 
+}
+
+#content .container_box .container_form ul li input.btn_image {
+  background: url(/common/ingrid/img/btn_send.gif) no-repeat left top; 
+  font-weight: bold; 
+  color: #CC0000; 
+  padding: 2px 3px 5px 33px; 
+  height: 20px;
+  cursor: pointer; 
+}
+
+#content .container_box .container_form ul li span.btn {
+  background: url(/common/ingrid/img/btn_corner.gif) no-repeat right top; 
+  padding: 0 6px 3px 0; 
+}
+
+#content .container_box .container_form ul li div.bold {
+	font-weight: bold;
+}
+
+#content .container_box .container_form ul li div.error {
+	color: #DD1B24;
+	margin-top: 3px;
+	margin-bottom: 3px;
+}
+
+#content .container_box .container_form ul li div.error ul {
+  padding: 0;
+}
+
+#content .container_box .container_form ul li div.error ul li {
+	color: #DD1B24;
+}
+
+#content .container_box .container_form ul li div.error span.label {
+  font-weight: normal;
+}
+
+#content .container_box .container_form div.info {
+	float: right;
+	position: relative;
+	margin: 4px 45px 0 0;
+	padding: 0;
+	width: 16px;
+	height: 16px;
+	background-image: url(/common/ingrid/img/b_form_info.gif);
+	background-repeat: no-repeat;
+}
+
+/* The IE Doubled Float-Margin Bug */
+/* http://www.positioniseverything.net/explorer/doubled-margin.html */
+
+#content .container_box .container_form div.info {
+	display: inline;
+}
+
+#content .container_box .container_form div.info div.infoBoxMagic {
+	position: absolute;
+  z-index: 5;
+	width: 16px;
+	height: 16px;
+  overflow: hidden;
+	background-image: url(/common/ingrid/img/info_arrow.gif);
+	background-repeat: no-repeat;
+	background-position: 23px 0;
+}
+
+#content .container_box .container_form div.info div.infoBoxMagic .content {
+	font-size: 11px;
+	margin-left: 30px;
+	padding: 0 10px;
+  margin-top: 0;
+  margin-bottom: 0;
+	background-color: #FFF;
+	border-left: 1px #B9C3EA solid;
+	border-right: 1px #B9C3EA solid;
+}
+
+#content .container_box .container_form div.info div.normal .header,
+#content .container_box .container_form div.info div.normal .footer,
+#content .container_box .container_form div.info div.big .header,
+#content .container_box .container_form div.info div.big .footer,
+#content .container_box .container_form div.info div.large .header,
+#content .container_box .container_form div.info div.large .footer {
+	height: 7px;
+	font-size: 1px;
+	margin-left: 30px;
+	background-repeat: no-repeat;
+}
+
+#content .container_box .container_form div.info div.normal .header {
+	width: 140px;
+	background-image: url(/common/ingrid/img/info_header_normal.gif);
+}
+
+#content .container_box .container_form div.info div.normal .content {
+  margin-right: 0;
+  line-height: 13px;
+}
+
+#content .container_box .container_form div.info div.normal .footer {
+	width: 140px;
+	background-image: url(/common/ingrid/img/info_footer_normal.gif);
+}
+
+#content .container_box .container_form div.info div.big .header {
+	width: 189px;
+	background-image: url(/common/ingrid/img/info_header_big.gif);
+}
+
+#content .container_box .container_form div.info div.big .content {
+  margin-right: 0;
+  line-height: 13px;
+}
+
+#content .container_box .container_form div.info div.big .footer {
+	width: 189px;
+	background-image: url(/common/ingrid/img/info_footer_big.gif);
+}
+
+#content .container_box .container_form div.info div.large .header {
+	width: 275px;
+	background-image: url(/common/ingrid/img/info_header_large.gif);
+}
+
+#content .container_box .container_form div.info div.large .content {
+  margin-right: 0;
+  line-height: 13px;
+}
+
+#content .container_box .container_form div.info div.large .footer {
+	width: 275px;
+	background-image: url(/common/ingrid/img/info_footer_large.gif);
+}
+
+#content .container_box .container_form div.info div.normal {
+	background-position: 23px 24px;
+}
+
+#content .container_box .container_form div.info div.big {
+	background-position: 23px 59px;
+}
+
+#content .container_box .container_form div.info div.large {
+	background-position: 23px 59px;
+}
+
+#content span.tooltip {
+  border-bottom: 1px #565656 dotted;
+}
+
+#content span.tooltip-text {
+  position: absolute;
+  z-index: 100;
+  display: none;
+  color: #565656;
+  font-size: 10px;
+  line-height: 12px;
+  width: 150px;
+  border: 1px #565656 solid;
+  padding: 3px;
+  background-color: #FAF9F4;
+}
