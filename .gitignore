@@ -1,4 +1,6 @@
+/build
 /docs/reports/
 /lib/.cache
 /nbproject/private/
 /projects/dist/cache/
+/projects/dist/log/
