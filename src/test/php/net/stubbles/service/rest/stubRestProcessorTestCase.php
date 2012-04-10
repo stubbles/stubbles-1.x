@@ -309,16 +309,6 @@ class stubRestProcessorTestCase extends PHPUnit_Framework_TestCase
         $this->mockRestHandlerFactory->expects($this->once())
                                      ->method('getDispatchUri')
                                      ->will($this->returnValue(null));
-        $mockErrorFormatter = $this->getMock('stubErrorFormatter');
-        $this->mockFormatFactory->expects($this->once())
-                                ->method('createErrorFormatter')
-                                ->will($this->returnValue($mockErrorFormatter));
-        $mockErrorFormatter->expects($this->once())
-                           ->method('formatMethodNotAllowedError')
-                           ->with($this->equalTo('DELETE'),
-                                  $this->equalTo(array('GET', 'POST', 'PUT', 'DUMMY', 'DUMMY2', 'RESTARGUMENTFILTER'))
-                             )
-                           ->will($this->returnValue('DELETE not valid, use GET, POST, PUT, DUMMY, DUMMY2 or RESTARGUMENTFILTER'));
         $this->assertSame($this->restProcessor, $this->restProcessor->startup(new stubUriRequest('/')));
         $this->mockRequest->expects($this->any())
                           ->method('getMethod')
@@ -329,9 +319,6 @@ class stubRestProcessorTestCase extends PHPUnit_Framework_TestCase
         $this->mockResponse->expects($this->at(1))
                            ->method('addHeader')
                            ->with($this->equalTo('Allow'), $this->equalTo('GET,POST,PUT,DUMMY,DUMMY2,RESTARGUMENTFILTER'));
-        $this->mockResponse->expects($this->at(3))
-                           ->method('write')
-                           ->with($this->equalTo('DELETE not valid, use GET, POST, PUT, DUMMY, DUMMY2 or RESTARGUMENTFILTER'));
         $this->assertSame($this->restProcessor, $this->restProcessor->process());
     }
 
@@ -367,6 +354,44 @@ class stubRestProcessorTestCase extends PHPUnit_Framework_TestCase
         $this->mockResponse->expects($this->once())
                            ->method('write')
                            ->with($this->equalTo('Internal Server Error'));
+        $this->assertSame($this->restProcessor, $this->restProcessor->process());
+    }
+
+    /**
+     * @since  1.8.0
+     * @test
+     * @group  rest_head
+     */
+    public function processSuccessfulHead()
+    {
+        $this->mockRestHandlerFactory->expects($this->once())
+                                     ->method('createHandler')
+                                     ->will($this->returnValue(new TestRestHandler()));
+        $this->mockRestHandlerFactory->expects($this->once())
+                                     ->method('getDispatchUri')
+                                     ->will($this->returnValue(null));
+        $mockFormatter = $this->getMock('stubFormatter');
+        $this->mockFormatFactory->expects($this->once())
+                                ->method('createFormatter')
+                                ->will($this->returnValue($mockFormatter));
+        $this->restProcessor->startup(new stubUriRequest('/'));
+        $this->mockRequest->expects($this->any())
+                          ->method('getMethod')
+                          ->will($this->returnValue('HEAD'));
+        $mockFormatter->expects($this->once())
+                      ->method('getContentType')
+                      ->will($this->returnValue('text/plain'));
+        $mockFormatter->expects($this->once())
+                      ->method('format')
+                      ->with($this->equalTo('a GET method'))
+                      ->will($this->returnValue('formatted content'));
+        $this->mockResponse->expects($this->never())
+                           ->method('write');
+        $this->mockResponse->expects($this->at(1))
+                           ->method('addHeader')
+                           ->with($this->equalTo('Content-Length'), $this->equalTo(17));
+        $this->mockResponse->expects($this->once())
+                           ->method('clearBody');
         $this->assertSame($this->restProcessor, $this->restProcessor->process());
     }
 

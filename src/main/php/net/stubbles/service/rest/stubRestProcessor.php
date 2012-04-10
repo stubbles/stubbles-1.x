@@ -92,10 +92,13 @@ class stubRestProcessor extends stubAbstractProcessor
         $this->routeName   = $uriRequest->getRemainingUri();
         $this->restHandler = $this->restHandlerFactory->createHandler($this->routeName);
         if (null === $this->restHandler) {
-            $this->response->write($this->getErrorFormatter()->formatNotFoundError());
+            if (!$this->isHeadRequest()) {
+                $this->response->write($this->getErrorFormatter()->formatNotFoundError());
+            }
+
             throw new stubProcessorException(404, 'Not Found');
         }
-        
+
         $this->session->putValue('net.stubbles.webapp.lastPage', $this->request->getMethod() . ':' . $this->routeName);
         return $this;
     }
@@ -124,7 +127,6 @@ class stubRestProcessor extends stubAbstractProcessor
             $this->response->setStatusCode(405);
             $allowedMethods = $this->listMethods();
             $this->response->addHeader('Allow', join(',', $allowedMethods));
-            $this->response->write($this->getErrorFormatter()->formatMethodNotAllowedError($this->request->getMethod(), $allowedMethods));
             return $this;
         }
 
@@ -133,7 +135,8 @@ class stubRestProcessor extends stubAbstractProcessor
             $result    = $formatter->format($method->invokeArgs($this->restHandler,
                                                                 $this->extractArguments($dispatch, $method)
                                             )
-                         );
+                        );
+            $this->response->addHeader('Content-Length', strlen($result));
         } catch (stubRestHandlerException $rhe) {
             $this->response->setStatusCode($rhe->getStatusCode());
             $result = $this->getErrorFormatter($method)->formatInternalServerError($rhe);
@@ -141,11 +144,28 @@ class stubRestProcessor extends stubAbstractProcessor
             throw $pe;
         } catch (stubException $e) {
             $this->response->setStatusCode(500);
-            $result = $this->getErrorFormatter($method)->formatInternalServerError($e);
+            if (!$this->isHeadRequest()) {
+                $result = $this->getErrorFormatter($method)->formatInternalServerError($e);
+            }
         }
 
-        $this->response->write($result);
+        if (!$this->isHeadRequest()) {
+            $this->response->write($result);
+        } else {
+            $this->response->clearBody();
+        }
+
         return $this;
+    }
+
+    /**
+     * checks if given request is a head request
+     *
+     * @return  bool
+     */
+    private function isHeadRequest()
+    {
+        return $this->request->getMethod() === 'HEAD';
     }
 
     /**
@@ -254,13 +274,16 @@ class stubRestProcessor extends stubAbstractProcessor
     protected function findMethod($dispatch)
     {
         $dispatchCount = strlen($dispatch);
-        $requestMethod = strtolower($this->request->getMethod());
+        $requestMethod = strtoupper($this->request->getMethod());
         $foundedMethod = null;
         foreach ($this->restHandler->getClass()->getMethodsByMatcher(new stubRestMethodsMatcher()) as $method) {
             /* @var  $method  stubReflectionMethod */
             $restMethodAnnotation = $method->getAnnotation('RestMethod');
-            if (strtolower($restMethodAnnotation->getRequestMethod()) !== $requestMethod) {
-                continue;
+            $allowedMethod        = strtoupper($restMethodAnnotation->getRequestMethod());
+            if ($allowedMethod !== $requestMethod) {
+                if ('GET' !== $allowedMethod || ('GET' == $allowedMethod && 'HEAD' !== $requestMethod)) {
+                    continue;
+                }
             }
 
             if (0 === $dispatchCount || $restMethodAnnotation->hasPath() === false) {
@@ -363,7 +386,7 @@ class stubRestProcessor extends stubAbstractProcessor
                                            ->getRequestMethod()
             );
         }
-        
+
         return array_values(array_unique($methods));
     }
 }
