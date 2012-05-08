@@ -251,13 +251,12 @@ class stubIpoBindingModule extends stubBaseObject implements stubBindingModule
      */
     protected function createResponse(stubRequest $request)
     {
-        $httpVersion = $request->readHeader('SERVER_PROTOCOL')->unsecure();
         $minor       = null;
-        $scanResult  = sscanf($httpVersion, 'HTTP/%*[1].%[01]', $minor);
+        $scanResult  = sscanf($request->readHeader('SERVER_PROTOCOL')->unsecure(), 'HTTP/%*[1].%[01]', $minor);
         $response    = $this->createResponseInstance('1.' . ((int) $minor));
         if (2 != $scanResult) {
             $response->setStatusCode(505);
-            $response->write('Unsupported HTTP protocol version "' . $httpVersion . '", expected HTTP/1.0 or HTTP/1.1' . "\n");
+            $response->write('Unsupported HTTP protocol version, expected HTTP/1.0 or HTTP/1.1' . "\n");
             $request->cancel();
         }
 
